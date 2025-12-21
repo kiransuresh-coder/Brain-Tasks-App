@@ -6,31 +6,35 @@ env:
     ECR_REPO_NAME: brain-tasks-app
     ECR_URI: 085165114613.dkr.ecr.us-east-1.amazonaws.com
     IMAGE_TAG: v1
+    EKS_CLUSTER_NAME: brain-task-cluster
 
 phases:
   install:
     commands:
-      - echo "Install phase - Docker already available"
+      - echo "Installing kubectl"
+      - curl -o kubectl https://s3.us-east-1.amazonaws.com/amazon-eks/1.32.0/2024-09-11/bin/linux/amd64/kubectl
+      - chmod +x kubectl
+      - mv kubectl /usr/local/bin/
 
   pre_build:
     commands:
+      - echo "Configuring kubeconfig for EKS"
+      - aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URI
 
   build:
     commands:
-      - echo "Build started on $(date)"
       - echo "Building Docker image..."
       - docker build -t $ECR_REPO_NAME:$IMAGE_TAG .
       - docker tag $ECR_REPO_NAME:$IMAGE_TAG $ECR_URI/$ECR_REPO_NAME:$IMAGE_TAG
 
   post_build:
     commands:
-      - echo "Pushing Docker image to ECR..."
+      - echo "Pushing Docker image..."
       - docker push $ECR_URI/$ECR_REPO_NAME:$IMAGE_TAG
-      - echo "Writing imagedefinitions.json"
-      - printf '[{"name":"brain-tasks-app","imageUri":"%s"}]' $ECR_URI/$ECR_REPO_NAME:$IMAGE_TAG > imagedefinitions.json
 
-artifacts:
-  files:
-    - imagedefinitions.json
+      - echo "Deploying to EKS"
+      - kubectl apply -f deployment.yaml
+      - kubectl apply -f service.yaml
