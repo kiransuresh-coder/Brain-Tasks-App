@@ -87,8 +87,6 @@ aws eks update-kubeconfig --region us-east-1 --name brain-task-cluster
 Use **CloudWatch Logs** to monitor pipeline and build logs.
 
 
-```
-
 **Verify service:**
 ```bash
 kubectl get svc brain-tasks-service
